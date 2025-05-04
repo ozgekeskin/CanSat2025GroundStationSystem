@@ -19,6 +19,7 @@ using GMap.NET.WindowsForms.Markers;
 using System.Globalization;
 using System.Windows.Controls;
 using System.Reflection.Emit;
+using static GMap.NET.Entity.OpenStreetMapRouteEntity;
 
 
 
@@ -96,13 +97,39 @@ namespace Grizu_Yer_istasyonu
             dataGridView2.Columns[11].Width = 90;
 
             //Harita Kodları
-            gMapControl1.MapProvider = GMapProviders.GoogleMap; 
-            GMaps.Instance.Mode = AccessMode.ServerOnly;       
-            gMapControl1.Position = new PointLatLng(41.449560015109554, 31.758533316730077); 
+            gMapControl1.MapProvider = GMapProviders.GoogleMap;
+            GMaps.Instance.Mode = AccessMode.ServerOnly;
+            gMapControl1.Position = new PointLatLng(41.449560015109554, 31.758533316730077);
             gMapControl1.MinZoom = 2;
             gMapControl1.MaxZoom = 18;
             gMapControl1.Zoom = 14;
 
+            //if (gMapControl1.InvokeRequired)
+            //{
+            //    gMapControl1.Invoke(new MethodInvoker(delegate {
+            //        gMapControl1.Position = new PointLatLng(41.449560015109554, 31.758533316730077);
+            //    }));
+            //}
+            //else
+            //{
+            //    gMapControl1.Position = new PointLatLng(41.449560015109554, 31.758533316730077);
+            //}
+            //if (double.TryParse(dataParts[23], out double gpsLatitude) && double.TryParse(dataParts[24], out double gpsLongitude))
+            //{
+            //    if (gpsLatitude != 0 && gpsLongitude != 0)
+            //    {
+            //        if (gMapControl1.InvokeRequired)
+            //        {
+            //            gMapControl1.Invoke(new MethodInvoker(delegate {
+            //                gMapControl1.Position = new PointLatLng(gpsLatitude, gpsLongitude);
+            //            }));
+            //        }
+            //        else
+            //        {
+            //            gMapControl1.Position = new PointLatLng(gpsLatitude, gpsLongitude);
+            //        }
+            //    }
+            //}
             //Serial port control paneli düzenlemeleri
             foreach (var seriPort in SerialPort.GetPortNames())
             {
@@ -111,7 +138,7 @@ namespace Grizu_Yer_istasyonu
             }
             if (portsayisi > 0)
             {
-                comboBoxPort.SelectedIndex = 1;
+                comboBoxPort.SelectedIndex = 0;
             }
             comboBoxBaudrate.Items.Add(9600);
             comboBoxBaudrate.Items.Add(19200);
@@ -411,6 +438,8 @@ namespace Grizu_Yer_istasyonu
         }
 
         int sayac = 0;
+        int lat ;
+        int lng ;
 
         private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
@@ -422,23 +451,32 @@ namespace Grizu_Yer_istasyonu
             float gyroPitch = float.Parse(dataParts[10]);
             float gyroYaw = float.Parse(dataParts[11]);
 
-            GL.Rotate(yaw, 0.0f, 1.0f, 0.0f);
-            GL.Rotate(pitch, 1.0f, 0.0f, 0.0f);
-            GL.Rotate(roll, 0.0f, 0.0f, 1.0f);
+            //int lat = int.Parse(dataParts[21]);
+            //int lng = int.Parse(dataParts[22]);
+
+            //GL.Rotate(yaw, 0.0f, 1.0f, 0.0f);
+            //GL.Rotate(pitch, 1.0f, 0.0f, 0.0f);
+            //GL.Rotate(roll, 0.0f, 0.0f, 1.0f);
+            
+
 
             string dosyaYolu = @"C:\Users\Özge\OneDrive\Desktop\Grizu Yer istasyonu\kayit.csv";
+            string klasorYolu = Path.GetDirectoryName(dosyaYolu);
+
+            // Klasör yoksa oluştur
+            if (!Directory.Exists(klasorYolu))
+            {
+                Directory.CreateDirectory(klasorYolu);
+            }
 
             // CSV'yi oluştur
-            StringBuilder csv = new StringBuilder();
             if (!File.Exists(dosyaYolu))
             {
                 File.WriteAllText(dosyaYolu,
-                "TEAM_ID,MISSION_TIME,PACKET_COUNT,MODE,STATE,ALTITUDE,TEMPERATURE,PRESSURE,VOLTAGE,GYRO_R,GYRO_P,GYRO_Y,ACCEL_R,ACCEL_P,ACCEL_Y,MAG_R,MAG_P,MAG_Y,AUTO_GYRO_ROTATION_RATE,GPS_TIME,GPS_ALTITUDE,GPS_LATITUDE,GPS_LONGITUDE,GPS_SATS,CMD_ECHO\n",
-                Encoding.UTF8);
+                    "TEAM_ID,MISSION_TIME,PACKET_COUNT,MODE,STATE,ALTITUDE,TEMPERATURE,PRESSURE,VOLTAGE,GYRO_R,GYRO_P,GYRO_Y,ACCEL_R,ACCEL_P,ACCEL_Y,MAG_R,MAG_P,MAG_Y,360,12.14.02,552,0,0,3,CXON,",
+                    Encoding.UTF8);
             }
 
-            // Dosyaya yaz
-            File.AppendAllText(dosyaYolu, telemetrypacket + "\n", Encoding.UTF8);
 
             timer1.Start();
 
@@ -448,40 +486,35 @@ namespace Grizu_Yer_istasyonu
             {
                 if (dataParts.Length >= 24)
                 {
-                    string latitude = dataParts[22].Trim();
-                    string longitude = dataParts[23].Trim();
+                    string latitude = dataParts[21].Trim();
+                    string longitude = dataParts[22].Trim();
                     double latitudeValue = double.Parse(latitude, CultureInfo.InvariantCulture);
                     double longitudeValue = double.Parse(longitude, CultureInfo.InvariantCulture);
-                    PointLatLng konum = new PointLatLng(latitudeValue, longitudeValue);
-                    // Haritayı konuma merkezle
-                    gMapControl1.Position = konum;
 
                     this.Invoke(new MethodInvoker(delegate
                     {
-                        
+                        PointLatLng konum = new PointLatLng(latitudeValue, longitudeValue);
+                        gMapControl1.Position = konum;
+                        gMapControl1.Overlays.Clear();
+                        GMapOverlay markersOverlay = new GMapOverlay("markers");
+                        GMarkerGoogle marker = new GMarkerGoogle(konum, GMarkerGoogleType.red_dot);
+                        marker.ToolTipText = $"Latitude: {latitudeValue}, Longitude: {longitudeValue}";
+                        marker.ToolTipMode = MarkerTooltipMode.Always;
+                        markersOverlay.Markers.Add(marker);
+                        gMapControl1.Overlays.Add(markersOverlay);
+
                         chart3.Series["TEMPURATURE"].Points.AddXY(sayac, dataParts[6]);
                         chart8.Series["PRESSURE"].Points.AddXY(sayac, dataParts[7]);
                         chart6.Series["ALTİTUDE"].Points.AddXY(sayac, dataParts[5]);
                         chart5.Series["VOLTAGE"].Points.AddXY(sayac, dataParts[8]);
 
-                        
                         dataGridView1.Rows.Insert(0, dataParts.Take(13).Select(p => p.Trim()).ToArray());
                         dataGridView2.Rows.Insert(0, dataParts.Skip(13).Take(12).Select(p => p.Trim()).ToArray());
 
-                        // DataGridView satır sınırını kontrol etme
                         if (dataGridView1.Rows.Count > 100)
                             dataGridView1.Rows.RemoveAt(dataGridView1.Rows.Count - 1);
                         if (dataGridView2.Rows.Count > 100)
                             dataGridView2.Rows.RemoveAt(dataGridView2.Rows.Count - 1);
-
-                        gMapControl1.Position = new PointLatLng(latitudeValue, longitudeValue);
-                        gMapControl1.Overlays.Clear();
-                        GMapOverlay markersOverlay = new GMapOverlay("markers");
-                        GMarkerGoogle marker = new GMarkerGoogle(new PointLatLng(latitudeValue, longitudeValue), GMarkerGoogleType.red_dot);
-                        marker.ToolTipText = $"Latitude: {latitudeValue}, Longitude: {longitudeValue}";
-                        marker.ToolTipMode = MarkerTooltipMode.Always;
-                        markersOverlay.Markers.Add(marker);
-                        gMapControl1.Overlays.Add(markersOverlay);
                     }));
                 }
                 else
@@ -499,6 +532,7 @@ namespace Grizu_Yer_istasyonu
                     MessageBox.Show("Veri okuma hatası: " + ex.Message);
                 }));
             }
+
 
         }
         private void glControl1_Load_1(object sender, EventArgs e)
